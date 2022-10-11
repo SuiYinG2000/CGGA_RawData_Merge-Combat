@@ -1,0 +1,89 @@
+---
+title: "CGGA_RawData_Merge&Combat-Expression"
+author: "Botao Wang"
+date: "2022-10-11"
+output: html_document
+
+params:
+  workdir: "E:\\PostGraduate\\Botao\\RAWDATA\\CGGA\\"
+  expr325: "CGGA.mRNAseq_325.Read_Counts-genes.20220620.txt"
+  expr693: "CGGA.mRNAseq_693.Read_Counts-genes.20220620.txt"
+---
+
+```{r setup, include=FALSE}
+# rm(list = ls())
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library("log4r")
+
+```
+
+## Prepare Describe
+
+```{r Describe}
+
+describe <- unlist(strsplit(params$expr325, split="\\."))
+
+describe <- paste(describe[1],
+                  unlist(strsplit(describe[2], split="_"))[1],
+                  describe[3],
+                  describe[4],
+                  sep=".")
+
+```
+
+
+## Prepare log
+
+```{r prepare log}
+
+# verify workdir
+dir.exists(params$workdir)
+
+logfile <- paste(params$workdir, "log.txt", sep="")
+if (!file.exists(logfile)){file.create(logfile)}
+
+logger <- create.logger(logfile = logfile, level="INFO")
+
+descript_work <- paste("[    ", describe, "    ]", sep="")
+
+info(logger, 
+     "------------------------------------------",
+     descript_work,
+     "------------------------------------------")
+info(logger, "START Work:")
+info(logger, "Expression 325 File:\t", params$expr325)
+info(logger, "Expression 693 File:\t", params$expr693)
+info(logger, "Data Type:\t", unlist(strsplit(params$expr325, split="\\."))[3])
+
+```
+
+
+## data existing verification
+
+```{r Existing Verification}
+
+data_file <- paste(params$workdir, "data\\", sep="")
+
+if (!file.exists(paste(data_file, params$expr325, sep=""))){
+  error(logger, "错误：325表达谱不存在！")
+  }
+if (!file.exists(paste(data_file, params$expr325, sep=""))){
+  error(logger, "错误：693表达谱不存在！")
+  }
+
+```
+
+
+## Prepare Data
+
+```{r Prepare Data}
+
+# read in expression files
+expr325 <- read.table(paste(data_file, params$expr325, sep=""), sep="\t", header=T, quote="", check.names=F)
+rownames(expr325) <- expr325$gene_name
+expr325 <- expr325[,-1]
+
+
+```
