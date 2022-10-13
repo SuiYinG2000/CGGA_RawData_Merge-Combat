@@ -113,12 +113,14 @@ if (!dir.exists(projectdir)){
 # load and handle mRNAseq_325
 #================================================
 expr325 <- read.table(paste(data_file, params$expr325, sep=""), sep="\t", header=T, quote="", check.names=F)
+colnames(expr325)[1] <- "gene_name"
 expr325_label <- rbind(c("label", rep("mRNAseq_325", length(expr325)-1)), expr325)
 info(logger, "mRNAseq_325共读入了：", length(expr325)-1, "个样本和", length(rownames(expr325)), "个基因")
 
 # load and handle mRNAseq_325
 #================================================
 expr693 <- read.table(paste(data_file, params$expr693, sep=""), sep="\t", header=T, quote="", check.names=F)
+colnames(expr693)[1] <- "gene_name"
 expr693_label <- rbind(c("label", rep("mRNAseq_693", length(expr693)-1)), expr693)
 info(logger, "mRNAseq_693共读入了：", length(expr693)-1, "个样本和", length(rownames(expr693)), "个基因")
 
