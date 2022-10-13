@@ -12,10 +12,20 @@ params:
 
 ```{r setup, include=FALSE}
 # rm(list = ls())
+# .rs.restartR()
 
 knitr::opts_chunk$set(echo = TRUE)
 
+# install.packages('ggfortify')
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("sva")
+
 library("log4r")
+library("ggfortify")
+library("sva")
+
 
 ```
 
@@ -41,7 +51,7 @@ describe <- paste(describe[1],
 # verify workdir
 dir.exists(params$workdir)
 
-logfile <- paste(params$workdir, "log.txt", sep="")
+logfile <- paste(params$workdir, "run.log", sep="")
 if (!file.exists(logfile)){file.create(logfile)}
 
 logger <- create.logger(logfile = logfile, level="INFO")
@@ -76,14 +86,127 @@ if (!file.exists(paste(data_file, params$expr325, sep=""))){
 ```
 
 
+## Prepare Direction
+
+```{r Prepare Direction}
+
+resultdir <- paste(params$workdir, "result\\", sep="")
+if (!dir.exists(resultdir)){dir.create(resultdir)}
+projectdir <- paste(resultdir, describe, "\\", sep="")
+if (!dir.exists(projectdir)){
+  dir.create(projectdir)
+} else {
+  warn(logger, "正在覆盖已存在的结果！")
+}
+
+```
+
+
 ## Prepare Data
 
 ```{r Prepare Data}
+#==============================================================================
+# --------------------------read in expression files---------------------------
+#==============================================================================
 
-# read in expression files
+
+# load and handle mRNAseq_325
+#================================================
 expr325 <- read.table(paste(data_file, params$expr325, sep=""), sep="\t", header=T, quote="", check.names=F)
-rownames(expr325) <- expr325$gene_name
-expr325 <- expr325[,-1]
+expr325_label <- rbind(c("label", rep("mRNAseq_325", length(expr325)-1)), expr325)
+info(logger, "mRNAseq_325共读入了：", length(expr325)-1, "个样本和", length(rownames(expr325)), "个基因")
 
+# load and handle mRNAseq_325
+#================================================
+expr693 <- read.table(paste(data_file, params$expr693, sep=""), sep="\t", header=T, quote="", check.names=F)
+expr693_label <- rbind(c("label", rep("mRNAseq_693", length(expr693)-1)), expr693)
+info(logger, "mRNAseq_693共读入了：", length(expr693)-1, "个样本和", length(rownames(expr693)), "个基因")
+
+# merge 325 & 693
+#================================================
+expr_label <-  merge(expr325_label, expr693_label, by="gene_name")
+
+CGGAnames <- c(colnames(expr325_label), colnames(expr693_label)[-1])
+if (length(CGGAnames == length(expr_label))){
+  info(logger, "整合后共有样本：", length(expr_label)-1)
+} else {
+  missGene <- setdiff(CGGAnames, colnames(expr_label))
+  missGene <- paste(missGene, collapse=",")
+  warn(logger, "整合后缺失样本:", missGene)
+}
+info(logger, "整合后共有基因：", length(rownames(expr_label))-1)
+
+
+#==============================================================================
+# -----------------------------handle expr merged------------------------------
+#==============================================================================
+
+rm(expr325, expr693, expr325_label, expr693_label)
+
+# handle expr_label
+rownames(expr_label) <- expr_label$gene_name
+expr_label <- expr_label[,-1]
+expr_label <- as.data.frame(t(expr_label), stringsAsFactors=F)
+
+expr <- subset(expr_label, select=-c(label))
+expr <- as.data.frame(apply(expr, 2, as.numeric), stringsAsFactors=F)
+rownames(expr) <- rownames(expr_label)
+
+expr_label <- cbind(label=expr_label$label, expr)
+
+```
+
+
+## Batch Verification
+
+```{r Batch Verification}
+
+# 查看原始数据的主成分分析，是否有批次效应
+pca <- prcomp(expr)
+
+png(filename=paste(projectdir, "raw_batch_effect_PCA.png", sep=""), width=3000, height=1000, res=300)
+plot(pca, type="l")
+autoplot(pca, data=expr_label, colour='label',size=0.1, label=TRUE,label.size=2)
+
+```
+
+
+## Remove Batch Effect
+
+```{r Remove Batch}
+# Remove Batch Effect
+expr <- as.data.frame(t(expr), stringsAsFactors=F)
+
+# save raw data
+rawData_file <- paste(projectdir, describe, ".Raw.csv", sep="")
+write.csv(expr, rawData_file)
+info(logger, "原始表达整合表达谱：\t", rawData_file)
+
+combat_expr <- ComBat(dat=expr, batch=expr_label$label)
+
+```
+
+
+## Check Removement
+
+```{r Check Removement}
+
+# 查看去批次效应后数据的主成分分析
+data <- as.data.frame(combat_expr)
+
+# save combat data
+combatData_file <- paste(projectdir, describe, ".ComBat.csv", sep="")
+write.csv(data, combatData_file)
+info(logger, "去批次化表达整合表达谱：\t", combatData_file, "\n")
+
+data <- as.data.frame(t(data))
+data_label <- as.data.frame(cbind(label=expr_label$label, data), stringsAsFactors=F)
+
+
+pca <- prcomp(data)
+
+png(filename=paste(projectdir, "remove_batch_effect_PCA.png", sep=""), width=3000, height=1000, res=300)
+plot(pca, type="l")
+autoplot(pca, data=data_label, colour='label',size=0.1, label=TRUE,label.size=2)
 
 ```
