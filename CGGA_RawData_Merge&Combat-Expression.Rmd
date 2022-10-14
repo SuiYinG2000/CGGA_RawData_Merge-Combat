@@ -90,7 +90,7 @@ if (!file.exists(paste(data_file, params$expr325, sep=""))){
 
 ```{r Prepare Direction}
 
-resultdir <- paste(params$workdir, "result\\", sep="")
+resultdir <- paste(params$workdir, "results\\", sep="")
 if (!dir.exists(resultdir)){dir.create(resultdir)}
 projectdir <- paste(resultdir, describe, "\\", sep="")
 if (!dir.exists(projectdir)){
